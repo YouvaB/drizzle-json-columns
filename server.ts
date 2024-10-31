@@ -52,7 +52,9 @@ app.post('/user', async (req, res)=> {
 app.get('/user', async (req, res)=> {
     const query = req.query;
     console.log(query);
-    const users = await db.select().from(usersTable).where(sql`name::jsonb->>'firstName' like '%${query.firstName}%'`)
+    const builtQuery = `name->>firstName like "%${query.firstName}%"`;
+
+    const users = await db.select().from(usersTable).where(builtQuery)
 
     res.send(users);
 })
