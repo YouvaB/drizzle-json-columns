@@ -1,23 +1,10 @@
-import { asc, like, sql, desc } from "drizzle-orm";
-import {
-  integer,
-  pgTable,
-  varchar,
-  jsonb,
-  PgDialect,
-} from "drizzle-orm/pg-core";
+import { asc, sql, desc } from "drizzle-orm";
 import { format } from "sql-formatter";
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import express from "express";
 import bodyParser from "body-parser";
-
-export const usersTable = pgTable("users", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: jsonb("name")
-    .$type<{ firstName: string; lastName: string }>()
-    .notNull(),
-});
+import { usersTable } from "./schema";
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -58,10 +45,6 @@ app.post("/user", async (req, res) => {
 
 app.get("/user", async (req, res) => {
   try {
-    const query = req.query;
-    const builtQuery = sql<string>`name->>'firstName' like '%${sql.placeholder(
-      "firstName"
-    )}%'`;
     const preparedRequest = db
       .select()
       .from(usersTable)
