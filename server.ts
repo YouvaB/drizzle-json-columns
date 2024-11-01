@@ -1,60 +1,87 @@
-import { sql } from "drizzle-orm";
-import { integer, pgTable, varchar, jsonb } from "drizzle-orm/pg-core";
+import { asc, like, sql, desc } from "drizzle-orm";
+import {
+  integer,
+  pgTable,
+  varchar,
+  jsonb,
+  PgDialect,
+} from "drizzle-orm/pg-core";
 import { format } from "sql-formatter";
 
-
-const { drizzle } = require('drizzle-orm/postgres-js');
-const express = require('express');
-const bodyParser = require('body-parser');
+import { drizzle } from "drizzle-orm/postgres-js";
+import express from "express";
+import bodyParser from "body-parser";
 
 export const usersTable = pgTable("users", {
-    id: integer().primaryKey().generatedAlwaysAsIdentity(),
-    name: jsonb('name').$type<{firstName: string, lastName: string}>().notNull(),
-  });
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: jsonb("name")
+    .$type<{ firstName: string; lastName: string }>()
+    .notNull(),
+});
 
 const app = express();
-app.use(bodyParser.urlencoded({extended: false}));
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
-const db = drizzle('postgresql://drizzle:drizzle@localhost:5533/drizzle_cols', {
-    logger: {
-        logQuery(query, params) {
-          // On utilise sql-formatter pour formater et afficher la requête
-          // SQL en mode debug
-            console.log(
-              format(query, {
-                params: [
-                  '',
-                  ...params.map((s) =>
-                    typeof s === 'string'
-                      ? `'${s.replaceAll("'", "''")}'`
-                      : String(s),
-                  ),
-                ],
-                language: 'postgresql',
-              }),
-            );
-        },
-      },
+const db = drizzle("postgresql://drizzle:drizzle@localhost:5533/drizzle_cols", {
+  logger: {
+    logQuery(query, params) {
+      // On utilise sql-formatter pour formater et afficher la requête
+      // SQL en mode debug
+      console.log(
+        "||||||||||||||||||||||||||\n",
+        format(query, {
+          params: [
+            "",
+            ...params.map((s) =>
+              typeof s === "string" ? `'${s.replaceAll("'", "''")}'` : String(s)
+            ),
+          ],
+          language: "postgresql",
+        }),
+        "\n||||||||||||||||||||||||||\n"
+      );
+    },
+  },
 });
 
 app.listen(3000, () => {
-    console.log('Server listening on port 3000.\n');
+  console.log("Server listening on port 3000.\n");
 });
 
-app.post('/user', async (req, res)=> {
-    const insertedvalue = await db.insert(usersTable).values({
-        ...req.body
-    })
-    res.send(insertedvalue)
-})
+app.post("/user", async (req, res) => {
+  const insertedvalue = await db.insert(usersTable).values({
+    ...req.body,
+  });
+  res.send(insertedvalue);
+});
 
-app.get('/user', async (req, res)=> {
+app.get("/user", async (req, res) => {
+  try {
     const query = req.query;
-    console.log(query);
-    const builtQuery = `name->>firstName like "%${query.firstName}%"`;
-
-    const users = await db.select().from(usersTable).where(builtQuery)
+    const builtQuery = sql<string>`name->>'firstName' like '%${sql.placeholder(
+      "firstName"
+    )}%'`;
+    const preparedRequest = db
+      .select()
+      .from(usersTable)
+      .where(
+        sql`"users"."name"->>'firstName' like ${sql.placeholder("firstName")}`
+      )
+      .orderBy(
+        (req.query.orderBy === "asc" ? asc : desc)(
+          sql`"users"."name"->>'firstName'`
+        )
+      )
+      .prepare("p1");
+    const users = await preparedRequest.execute({
+      firstName: `%${req.query.firstName}%`,
+      orderBy: req.query.orderBy,
+    });
 
     res.send(users);
-})
+  } catch (error) {
+    console.error(error);
+    res.send(error);
+  }
+});
