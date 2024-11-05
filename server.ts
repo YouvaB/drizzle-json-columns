@@ -59,7 +59,6 @@ app.get("/user", async (req, res) => {
       .prepare("p1");
     const users = await preparedRequest.execute({
       firstName: `%${req.query.firstName}%`,
-      orderBy: req.query.orderBy,
     });
 
     res.send(users);
